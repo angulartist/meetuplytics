@@ -8,7 +8,7 @@ def timestamp_to_str(timestamp, fmt='%Y-%m-%d %H:%M:%S'):
     return datetime.fromtimestamp(timestamp).strftime(fmt)
 
 
-class AddTimestampDoFn(beam.DoFn):
+class AddTimestampFn(beam.DoFn):
     """
     Use event-time instead of processing-time
     Divide by 1000.0 to works with seconds and to keep precision
@@ -25,7 +25,7 @@ class AddTimestampDoFn(beam.DoFn):
         yield beam.window.TimestampedValue(element, int(element['timestamp']) / 1000.0)
 
 
-class FilterNoVenueEventsDoFn(beam.DoFn):
+class FilterNoVenueEventsFn(beam.DoFn):
     """ Keep away RSVPS which have a private venue """
 
     def to_runner_api_parameter(self, unused_context):
@@ -38,7 +38,7 @@ class FilterNoVenueEventsDoFn(beam.DoFn):
             return
 
 
-class PairTopicWithOneDoFn(beam.DoFn):
+class PairTopicWithOneFn(beam.DoFn):
     """ Build a paired-with-one tuple (topic, 1) """
 
     def to_runner_api_parameter(self, unused_context):
@@ -51,25 +51,33 @@ class PairTopicWithOneDoFn(beam.DoFn):
             yield ('%s$%s' % (topic['urlkey'], topic['topic_name']), 1)
 
 
-class TopicScoresDictDoFn(beam.DoFn):
+class FormatTopTopicFn(beam.DoFn):
     def to_runner_api_parameter(self, unused_context):
         pass
 
     def process(self,
-                element,
+                element=beam.DoFn.ElementParam,
                 timestamp_param=beam.DoFn.TimestampParam,
                 window_param=beam.DoFn.WindowParam):
-        key, score = element
-        topic_key, topic_name = key.split('$')
         window_start, window_end, timestamp = [timestamp_to_str(window_param.start),
                                                timestamp_to_str(window_param.end),
-                                               int(timestamp_param)]
+                                               int(timestamp_param) + 1000]
+
+        topics = []
+        for pair in element:
+            key, score = pair
+            topic_key, topic_name = key.split('$')
+            topics.append({
+                    "topic_key" : topic_key,
+                    "topic_name": topic_name,
+                    "score"     : score
+            })
 
         yield {
-                'topic_key'   : topic_key,
-                'topic_name'  : topic_name,
-                'score'       : score,
-                'window_start': window_start,
-                'window_end'  : window_end,
-                'timestamp'   : timestamp
+                'topics'   : topics,
+                'timestamp': timestamp,
+                'window'   : {
+                        "start": window_start,
+                        "end"  : window_end
+                }
         }

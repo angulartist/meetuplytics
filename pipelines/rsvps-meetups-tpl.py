@@ -57,47 +57,49 @@ def run(argv=None):
                     ).with_output_types(six.binary_type)
              | 'Decode Binary' >> beam.Map(lambda element: element.decode('utf-8'))
              | 'Transform Json To Dict' >> beam.Map(lambda element: json.loads(element))
-             | 'Filter noVenue' >> beam.ParDo(FilterNoVenueEventsDoFn()))
+             | 'Filter noVenue' >> beam.ParDo(FilterNoVenueEventsFn()))
 
         """ 
         -> Outputs the total number of events globally processed by the pipeline.
         Triggering early results from the window every X seconds (processing time trigger)
         or triggering when the current pane has collected at least N elements (data-driven trigger)
+        Values used are for testing purposes.
         """
         (inputs
          | 'Apply Global Window' >> beam.WindowInto(
                         beam.window.GlobalWindows(),
                         trigger=trigger.Repeatedly(
                                 trigger.AfterAny(
-                                        trigger.AfterCount(50),
+                                        trigger.AfterCount(25),
                                         trigger.AfterProcessingTime(1 * 60)
                                 )),
                         accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
-         | 'Counts events' >> beam.CombineGlobally(
+         | 'Count events globally' >> beam.CombineGlobally(
                         beam.combiners.CountCombineFn()).without_defaults()
-         | 'Publish %s' % 'Events' >> EncodeAndPublish(topic=known_args.output_topic,
-                                                       category=Category.GLOBAL_EVENTS))
+         | 'Publish %s' % 'Events' >> WriteToPubSub(topic=known_args.output_topic,
+                                                    category=Category.GLOBAL_EVENTS))
 
         """
-        -> Outputs the number of occurrences for each topic within
-        a fixed window of X seconds. 
-        Triggering early results when the current pane
-        has collected at least X elements.
-        NB: Elements are batched to soften later Cloud Functions invocation. 
+        -> Outputs the top 10 hottest topics within a Fixed Window of X seconds. 
+        Triggering early results when the current pane has collected at least X elements.
+        NB: Elements are batched to soften later Cloud Functions invocation.
+        Values used are for testing purposes.
         """
         (inputs
          | 'Apply Window of time %s' % 'Topics' >> beam.WindowInto(
                         beam.window.FixedWindows(size=5 * 60),
-                        trigger=trigger.Repeatedly(trigger.AfterCount(10)),
+                        trigger=trigger.Repeatedly(trigger.AfterCount(20)),
                         accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
          | beam.Map(lambda element: element['group'])
-         | beam.ParDo(PairTopicWithOneDoFn())
-         | 'CAS %s' % 'Topics' >> beam.CombinePerKey(sum)
-         | 'Build Dict %s' % 'Topics' >> beam.ParDo(TopicScoresDictDoFn())
-         | 'Batching PCollections' >> beam.BatchElements(min_batch_size=49,
-                                                         max_batch_size=50)
-         | 'Publish %s' % 'Topics' >> EncodeAndPublish(topic=known_args.output_topic,
-                                                       category=Category.HOT_TOPICS))
+         | beam.ParDo(PairTopicWithOneFn())
+         | beam.CombinePerKey(sum)
+         | 'Top 10 Topics' >> beam.CombineGlobally(
+                        beam.combiners.TopCombineFn(n=10,
+                                                    compare=lambda a, b: a[1] < b[
+                                                        1])).without_defaults()
+         | 'DictFormat %s' % 'Topics' >> beam.ParDo(FormatTopTopicFn())
+         | 'Publish %s' % 'Topics' >> WriteToPubSub(topic=known_args.output_topic,
+                                                    category=Category.HOT_TOPICS))
         # ...BigQueryIO Example...
 
         # | '' >> WriteToBigQuery(

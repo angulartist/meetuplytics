@@ -3,46 +3,28 @@ import {rsvpsOutput, db, serverTimestamp} from './_config/main.config'
 import {Category, CategoryType} from './models/Category'
 // Paths
 const statsRef = db.doc('rsvps/stats')
-const topicStatsRef = statsRef.collection('topics')
+const hotTopicStatsRef = statsRef.collection('hot_topics')
 
-const handleHotTopics = (collection: any[]) => {
-    if (!collection) throw new Error('Collection argument is required.')
-
-    const batch = db.batch()
-
-    collection.forEach((element: any) => {
-        const {topic_key, topic_name, score, window_start, window_end, timestamp} = element
-        const topicRef = topicStatsRef.doc(`${topic_key}`)
-        const topicTimestampRef = topicRef.collection('timestamps').doc(`${timestamp}`)
-
-        batch.set(topicRef, {
-            name: topic_name,
-            lastUpdated: serverTimestamp,
-            currentScore: score
-        }, {merge: true})
-
-        batch.set(topicTimestampRef, {
-            score: score,
-            windowStart: window_start,
-            windowEnd: window_end,
-            timestamp
-        }, {merge: true})
-    })
+const handleHotTopics = (output: any) => {
+    const {topics, timestamp, window} = output
+    const topicTimestampRef = hotTopicStatsRef.doc(`${timestamp}`)
 
     try {
-        return batch.commit()
+        return topicTimestampRef.set({
+            topics,
+            timestamp,
+            window: window,
+            lastUpdated: serverTimestamp
+        }, {merge: true})
     } catch (e) {
         throw new Error(e)
     }
-
 }
 
-const updateEventsCounter = (score: number) => {
-    if (!score) throw new Error('Score argument is required.')
-
+const updateEventsCounter = (output: any) => {
     try {
         return statsRef.set({
-            events: score,
+            events: output,
             lastUpdated: serverTimestamp
         }, {merge: true})
     } catch (e) {
@@ -53,13 +35,13 @@ const updateEventsCounter = (score: number) => {
 export const onPublishRSVPS = functions.pubsub
     .topic(rsvpsOutput)
     .onPublish(async (payload: functions.pubsub.Message) => {
-        const {category, collection, score} = JSON.parse(Buffer.from(payload.data, 'base64').toString())
+        const {category, output} = JSON.parse(Buffer.from(payload.data, 'base64').toString())
 
         switch (category) {
             case CategoryType.get(Category.HOT_TOPICS):
-                return handleHotTopics(collection)
+                return handleHotTopics(output)
             case CategoryType.get(Category.GLOBAL_EVENTS):
-                return updateEventsCounter(score)
+                return updateEventsCounter(output)
             default:
                 throw new Error('Unknown Category')
         }

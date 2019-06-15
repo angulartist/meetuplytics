@@ -10,14 +10,14 @@ class Category(object):
     GLOBAL_EVENTS = "GLOBAL_EVENTS"
 
 
-class PrintDoFn(beam.DoFn):
+class PrintFn(beam.DoFn):
     """ A DoFn that prints the current element, its window, and its timestamp. """
 
     def to_runner_api_parameter(self, unused_context):
         pass
 
     def __init__(self, *unused_args, **unused_kwargs):
-        super(PrintDoFn, self).__init__(*unused_args, **unused_kwargs)
+        super(PrintFn, self).__init__(*unused_args, **unused_kwargs)
 
     def process(self, element, timestamp=beam.DoFn.TimestampParam,
                 window=beam.DoFn.WindowParam):
@@ -63,38 +63,31 @@ class WriteToBigQuery(beam.PTransform):
                                           self.get_schema()))
 
 
-class BindCategoryDoFn(beam.DoFn):
+class BindCategoryFn(beam.DoFn):
     def to_runner_api_parameter(self, unused_context):
         pass
 
     def __init__(self, category, *unused_args):
-        super(BindCategoryDoFn, self).__init__(*unused_args)
+        super(BindCategoryFn, self).__init__(*unused_args)
         self.category = category
 
     def process(self, element):
-        d = {"category": self.category}
-
-        if isinstance(element, list):
-            d["collection"] = element
-        else:
-            d["score"] = element
-
-        yield d
+        yield {"category": self.category, "output": element}
 
 
-class EncodeAndPublish(beam.PTransform):
+class WriteToPubSub(beam.PTransform):
     def __init__(self, topic, category):
-        super(EncodeAndPublish, self).__init__()
+        super(WriteToPubSub, self).__init__()
         self.topic = topic
         self.category = category
 
     def expand(self, p):
         output = (p
-                  | 'Bind Category' >> beam.ParDo(
-                        BindCategoryDoFn(category=self.category))
-                  | 'Encode Dict To Buffer' >> beam.Map(
+                  | 'Attach Category' >> beam.ParDo(
+                        BindCategoryFn(category=self.category))
+                  | 'Make base64 string' >> beam.Map(
                         lambda element: json.dumps(element))
-                  | 'Debug' >> beam.ParDo(PrintDoFn()))
+                  | 'DEBUG:' >> beam.ParDo(PrintFn()))
 
         return output | 'Publish To Pub/Sub' >> beam.io.WriteToPubSub(
                 topic=self.topic).with_output_types(six.binary_type)
