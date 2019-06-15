@@ -9,13 +9,13 @@ Visualize hot topics by countries, responses type, locations types etc. from dat
 
 ### Implementation
 
-![](https://i.imgur.com/j7yguiJ.png)
+![](https://i.imgur.com/Cw4jcQA.png)
 
 ### Sample outputs:
 
 #### Live charts using CF/Firestore (NoSQL DB) / ApexCharts
 
-![](sample_charts.gif)
+![](stats.gif)
 
 ### Run the pipeline locally :
 
