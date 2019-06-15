@@ -81,15 +81,13 @@ def run(argv=None):
 
         """
         -> Outputs the top 10 hottest topics within a Fixed Window of X seconds. 
-        Triggering early results when the current pane has collected at least X elements.
-        NB: Elements are batched to soften later Cloud Functions invocation.
         Values used are for testing purposes.
         """
         (inputs
          | 'Apply Window of time %s' % 'Topics' >> beam.WindowInto(
-                        beam.window.FixedWindows(size=5 * 60),
-                        trigger=trigger.Repeatedly(trigger.AfterCount(20)),
-                        accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
+                        beam.window.FixedWindows(size=5 * 60))
+         # trigger=trigger.Repeatedly(trigger.AfterCount(2)),
+         # accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
          | beam.Map(lambda element: element['group'])
          | beam.ParDo(PairTopicWithOneFn())
          | beam.CombinePerKey(sum)
