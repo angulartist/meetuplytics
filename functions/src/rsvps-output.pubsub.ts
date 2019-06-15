@@ -1,5 +1,5 @@
 import * as functions from 'firebase-functions'
-import {rsvpsOutput, db, fv, ts} from './_config/main.config'
+import {rsvpsOutput, db, serverTimestamp} from './_config/main.config'
 import {Category, CategoryType} from './models/Category'
 // Paths
 const statsRef = db.doc('rsvps/stats')
@@ -17,12 +17,12 @@ const handleHotTopics = (collection: any[]) => {
 
         batch.set(topicRef, {
             name: topic_name,
-            weight: fv.increment(score),
-            lastUpdated: ts
+            lastUpdated: serverTimestamp,
+            currentScore: score
         }, {merge: true})
 
         batch.set(topicTimestampRef, {
-            score: fv.increment(score),
+            score: score,
             windowStart: window_start,
             windowEnd: window_end,
             timestamp
@@ -41,7 +41,10 @@ const updateEventsCounter = (score: number) => {
     if (!score) throw new Error('Score argument is required.')
 
     try {
-        return statsRef.set({events: score, lastUpdated: ts}, {merge: true})
+        return statsRef.set({
+            events: score,
+            lastUpdated: serverTimestamp
+        }, {merge: true})
     } catch (e) {
         throw new Error(e)
     }

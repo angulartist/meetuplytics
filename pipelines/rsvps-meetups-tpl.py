@@ -89,7 +89,7 @@ def run(argv=None):
          | 'Apply Window of time %s' % 'Topics' >> beam.WindowInto(
                         beam.window.FixedWindows(size=5 * 60),
                         trigger=trigger.Repeatedly(trigger.AfterCount(10)),
-                        accumulation_mode=trigger.AccumulationMode.DISCARDING)
+                        accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
          | beam.Map(lambda element: element['group'])
          | beam.ParDo(PairTopicWithOneDoFn())
          | 'CAS %s' % 'Topics' >> beam.CombinePerKey(sum)
@@ -100,7 +100,7 @@ def run(argv=None):
                                                        category=Category.HOT_TOPICS))
         # ...BigQueryIO Example...
 
-        # | 'SinkTopicsByCountry' >> WriteToBigQuery(
+        # | '' >> WriteToBigQuery(
         #            'topics', 'rsvps', {
         #                'country': 'STRING',
         #                'topic': 'STRING',
