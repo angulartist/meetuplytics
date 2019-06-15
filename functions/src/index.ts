@@ -1,0 +1,1 @@
+export {onPublishRSVPS} from './rsvps-output.pubsub'

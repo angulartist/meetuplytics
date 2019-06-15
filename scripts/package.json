@@ -1,0 +1,15 @@
+{
+  "name": "rsvps",
+  "version": "1.0.0",
+  "description": "im awesome",
+  "main": "rsvps",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google-cloud/pubsub": "^0.28.1",
+    "ws": "^7.0.0"
+  }
+}
