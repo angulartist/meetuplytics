@@ -11,10 +11,6 @@ Visualize hot topics by countries, responses type, locations types etc. from dat
 
 ![](https://i.imgur.com/Cw4jcQA.png)
 
-### Sample outputs:
-
-![](stats.gif)
-
 ### Run the pipeline locally :
 
 > Requires apache-beam[gcp] package and Python 2.7
