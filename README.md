@@ -13,8 +13,6 @@ Visualize hot topics by countries, responses type, locations types etc. from dat
 
 ### Sample outputs:
 
-#### Live charts using CF/Firestore (NoSQL DB) / ApexCharts
-
 ![](stats.gif)
 
 ### Run the pipeline locally :
@@ -22,6 +20,8 @@ Visualize hot topics by countries, responses type, locations types etc. from dat
 > Requires apache-beam[gcp] package and Python 2.7
 
 You need to set up your owns Pub/Sub I/O topics and project.
+
+[Get Started with Python for Dataflow](https://cloud.google.com/dataflow/docs/quickstarts/quickstart-python)
 
 ```
 $ python pipelines/rsvps-meetups-tpl.py
