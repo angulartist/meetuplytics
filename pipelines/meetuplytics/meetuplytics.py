@@ -15,8 +15,8 @@ from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import SetupOptions
 from apache_beam.options.pipeline_options import StandardOptions, GoogleCloudOptions
 from apache_beam.transforms import trigger
-from transformers import *
-from utils import *
+from meetuplytics.transformers import *
+from meetuplytics.utils import *
 
 SECONDS_IN_1_DAY = 3600 * 24
 
@@ -109,8 +109,3 @@ def run(argv=None):
         #                'window_end': 'STRING',
         #                'timestamp': 'INTEGER',
         #            }, options.view_as(GoogleCloudOptions).project))
-
-
-if __name__ == '__main__':
-    logging.getLogger().setLevel(logging.INFO)
-    run()
