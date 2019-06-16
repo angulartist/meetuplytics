@@ -22,28 +22,36 @@ SECONDS_IN_1_DAY = 3600 * 24
 
 
 def run(argv=None):
-    parser = argparse.ArgumentParser()
+    class MyOptions(PipelineOptions):
 
-    parser.add_argument(
-            '--input_topic', default='projects/notbanana-7f869/topics/rsvps_source')
-    parser.add_argument(
-            '--output_topic', default='projects/notbanana-7f869/topics/rsvps_out')
+        @classmethod
+        def _add_argparse_args(cls, parser):
+            parser.add_argument(
+                    '--input', default='projects/notbanana-7f869/topics/rsvps_source')
+            parser.add_argument(
+                    '--output', default='projects/notbanana-7f869/topics/rsvps_out')
 
-    known_args, pipeline_args = parser.parse_known_args(argv)
+    options = PipelineOptions(flags=argv)
 
-    pipeline_options = PipelineOptions(pipeline_args)
-    pipeline_options.view_as(SetupOptions).save_main_session = True
-    pipeline_options.view_as(StandardOptions).streaming = True
+    options.view_as(SetupOptions).save_main_session = True
+    options.view_as(StandardOptions).streaming = True
 
-    # pipeline_options.view_as(StandardOptions).runner = 'DataflowRunner'
-
-    google_cloud_options = pipeline_options.view_as(GoogleCloudOptions)
+    google_cloud_options = options.view_as(GoogleCloudOptions)
     google_cloud_options.project = 'notbanana-7f869'
     google_cloud_options.staging_location = 'gs://notbanana-7f869.appspot.com/staging'
     google_cloud_options.temp_location = 'gs://notbanana-7f869.appspot.com/temp'
     google_cloud_options.job_name = 'demo-job'
+    """
+    -> Run the pipeline on the Cloud Dataflow runner.
+    $ python pipelines/main.py --setup_file path/to/setup.py
+    """
+    # options.view_as(StandardOptions).runner = 'DataflowRunner'
 
-    with beam.Pipeline(options=pipeline_options) as p:
+    with beam.Pipeline(options=options) as p:
+        my_options = options.view_as(MyOptions)
+        input_topic = my_options.input
+        output_topic = my_options.output
+
         """
         -> Consumes/collects events sent by the input Pub/Sub topic.
         @: id_label argument is a unique identifier used by the pipeline to
@@ -52,7 +60,7 @@ def run(argv=None):
         inputs = \
             (p
              | 'Read From Pub/Sub' >> beam.io.ReadFromPubSub(
-                            topic=known_args.input_topic,
+                            topic=input_topic,
                             # id_label='event_id'
                     ).with_output_types(six.binary_type)
              | 'Decode Binary' >> beam.Map(lambda element: element.decode('utf-8'))
@@ -71,41 +79,35 @@ def run(argv=None):
                         trigger=trigger.Repeatedly(
                                 trigger.AfterAny(
                                         trigger.AfterCount(25),
+                                        # AfterProcessingTime is experimental.
+                                        # Not implemented yet.
                                         trigger.AfterProcessingTime(1 * 60)
                                 )),
                         accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
          | 'Count events globally' >> beam.CombineGlobally(
                         beam.combiners.CountCombineFn()).without_defaults()
-         | 'Publish %s' % 'Events' >> WriteToPubSub(topic=known_args.output_topic,
+         | 'Publish %s' % 'Events' >> WriteToPubSub(topic=output_topic,
                                                     category=Category.GLOBAL_EVENTS))
 
         """
         -> Outputs the top 10 hottest topics within a Fixed Window of X seconds. 
         Values used are for testing purposes.
+        TODO: Fix duplicated k/v pairs when using TopCombineFn with triggers.
         """
         (inputs
          | 'Apply Window of time %s' % 'Topics' >> beam.WindowInto(
-                        beam.window.FixedWindows(size=5 * 60))
-         # trigger=trigger.Repeatedly(trigger.AfterCount(2)),
-         # accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
+                        beam.window.FixedWindows(size=5 * 60),
+                        trigger=trigger.Repeatedly(trigger.AfterCount(1)),
+                        accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
          | beam.Map(lambda element: element['group'])
          | beam.ParDo(PairTopicWithOneFn())
          | beam.CombinePerKey(sum)
+         # | beam.Distinct()
          | 'Top 10 Topics' >> beam.CombineGlobally(
-                        beam.combiners.TopCombineFn(n=10,
+                        beam.combiners.TopCombineFn(n=5,
                                                     compare=lambda a, b: a[1] < b[
                                                         1])).without_defaults()
          | 'DictFormat %s' % 'Topics' >> beam.ParDo(FormatTopTopicFn())
-         | 'Publish %s' % 'Topics' >> WriteToPubSub(topic=known_args.output_topic,
+         # | 'd' >> beam.ParDo(PrintFn()))
+         | 'Publish %s' % 'Topics' >> WriteToPubSub(topic=output_topic,
                                                     category=Category.HOT_TOPICS))
-        # ...BigQueryIO Example...
-
-        # | '' >> WriteToBigQuery(
-        #            'topics', 'rsvps', {
-        #                'country': 'STRING',
-        #                'topic': 'STRING',
-        #                'score': 'INTEGER',
-        #                'window_start': 'STRING',
-        #                'window_end': 'STRING',
-        #                'timestamp': 'INTEGER',
-        #            }, options.view_as(GoogleCloudOptions).project))
