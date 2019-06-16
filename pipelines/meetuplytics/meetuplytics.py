@@ -15,6 +15,7 @@ from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import SetupOptions
 from apache_beam.options.pipeline_options import StandardOptions, GoogleCloudOptions
 from apache_beam.transforms import trigger
+from meetuplytics.custom.combiners.top import TopDistinctFn
 from meetuplytics.transformers import *
 from meetuplytics.utils import *
 
@@ -78,7 +79,7 @@ def run(argv=None):
                         beam.window.GlobalWindows(),
                         trigger=trigger.Repeatedly(
                                 trigger.AfterAny(
-                                        trigger.AfterCount(10),
+                                        trigger.AfterCount(20),
                                         # AfterProcessingTime is experimental.
                                         # Not implemented yet.
                                         trigger.AfterProcessingTime(1 * 60)
@@ -98,14 +99,14 @@ def run(argv=None):
          | 'Apply Window of time %s' % 'Topics' >> beam.WindowInto(
                         beam.window.FixedWindows(size=10 * 60),
                         trigger=trigger.Repeatedly(trigger.AfterCount(10)),
-                        accumulation_mode=trigger.AccumulationMode.DISCARDING)
+                        accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
          | beam.Map(lambda element: element['group'])
          | beam.ParDo(PairTopicWithOneFn())
          | beam.CombinePerKey(sum)
          | 'Top 10 Topics' >> beam.CombineGlobally(
-                        beam.combiners.TopCombineFn(n=10,
-                                                    compare=lambda a, b: a[1] < b[
-                                                        1])).without_defaults()
+                        TopDistinctFn(n=10,
+                                      compare=lambda a, b: a[1] < b[
+                                          1])).without_defaults()
          | 'DictFormat %s' % 'Topics' >> beam.ParDo(FormatTopTopicFn())
          | 'Publish %s' % 'Topics' >> WriteToPubSub(topic=output_topic,
                                                     category=Category.HOT_TOPICS))
