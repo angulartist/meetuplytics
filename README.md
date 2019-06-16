@@ -9,6 +9,12 @@ Visualize trending topics from Meetup in real-time.
 
 ![](https://i.imgur.com/Cw4jcQA.png)
 
+### Sample output
+
+> Updating the trending topics in real-time to Firestore
+
+![](https://i.imgur.com/vJYgKZa.gif)
+
 ### Run the pipeline locally :
 
 > Requires apache-beam[gcp] package and Python 2.7
