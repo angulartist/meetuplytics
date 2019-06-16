@@ -1,5 +1,5 @@
 import * as functions from 'firebase-functions'
-import {rsvpsOutput, db, serverTimestamp} from './_config/main.config'
+import {rsvpsOutput, db, serverTimestamp, transaction} from './_config/main.config'
 import {Category, CategoryType} from './models/Category'
 // Paths
 const statsRef = db.doc('rsvps/stats')
@@ -8,14 +8,29 @@ const hotTopicStatsRef = statsRef.collection('hot_topics')
 const handleHotTopics = (output: any) => {
     const {topics, timestamp, window} = output
     const topicTimestampRef = hotTopicStatsRef.doc(`${timestamp}`)
+    const topicsRef = topicTimestampRef.collection('topics')
 
-    try {
-        return topicTimestampRef.set({
-            topics,
-            timestamp,
-            window: window,
+    // Instantiate a new batch
+    const batch = db.batch()
+
+    batch.set(topicTimestampRef, {
+        timestamp,
+        window: window,
+        lastUpdated: serverTimestamp
+    }, {merge: true})
+
+    topics.forEach(({topic_name, topic_key, score}: any) => {
+        const currentTopicRef = topicsRef.doc(`${topic_key}`)
+
+        batch.set(currentTopicRef, {
+            name: topic_name,
+            score: transaction.increment(score),
             lastUpdated: serverTimestamp
         }, {merge: true})
+    })
+
+    try {
+        return batch.commit()
     } catch (e) {
         throw new Error(e)
     }

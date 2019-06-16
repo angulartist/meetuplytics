@@ -78,7 +78,7 @@ def run(argv=None):
                         beam.window.GlobalWindows(),
                         trigger=trigger.Repeatedly(
                                 trigger.AfterAny(
-                                        trigger.AfterCount(25),
+                                        trigger.AfterCount(10),
                                         # AfterProcessingTime is experimental.
                                         # Not implemented yet.
                                         trigger.AfterProcessingTime(1 * 60)
@@ -96,18 +96,16 @@ def run(argv=None):
         """
         (inputs
          | 'Apply Window of time %s' % 'Topics' >> beam.WindowInto(
-                        beam.window.FixedWindows(size=5 * 60),
-                        trigger=trigger.Repeatedly(trigger.AfterCount(1)),
-                        accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
+                        beam.window.FixedWindows(size=10 * 60),
+                        trigger=trigger.Repeatedly(trigger.AfterCount(10)),
+                        accumulation_mode=trigger.AccumulationMode.DISCARDING)
          | beam.Map(lambda element: element['group'])
          | beam.ParDo(PairTopicWithOneFn())
          | beam.CombinePerKey(sum)
-         # | beam.Distinct()
          | 'Top 10 Topics' >> beam.CombineGlobally(
-                        beam.combiners.TopCombineFn(n=5,
+                        beam.combiners.TopCombineFn(n=10,
                                                     compare=lambda a, b: a[1] < b[
                                                         1])).without_defaults()
          | 'DictFormat %s' % 'Topics' >> beam.ParDo(FormatTopTopicFn())
-         # | 'd' >> beam.ParDo(PrintFn()))
          | 'Publish %s' % 'Topics' >> WriteToPubSub(topic=output_topic,
                                                     category=Category.HOT_TOPICS))
