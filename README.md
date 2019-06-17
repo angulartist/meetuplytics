@@ -13,7 +13,7 @@ Visualize trending topics from Meetup in real-time.
 
 > Updating the trending topics in real-time to Firestore
 
-![](https://i.imgur.com/vJYgKZa.gif)
+![](test_pipeline.gif)
 
 ### Run the pipeline locally :
 

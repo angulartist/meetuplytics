@@ -79,10 +79,10 @@ def run(argv=None):
                         beam.window.GlobalWindows(),
                         trigger=trigger.Repeatedly(
                                 trigger.AfterAny(
-                                        trigger.AfterCount(20),
+                                        trigger.AfterCount(2),
                                         # AfterProcessingTime is experimental.
                                         # Not implemented yet.
-                                        trigger.AfterProcessingTime(1 * 60)
+                                        trigger.AfterProcessingTime(30)
                                 )),
                         accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
          | 'Count events globally' >> beam.CombineGlobally(
@@ -93,12 +93,13 @@ def run(argv=None):
         """
         -> Outputs the top 10 hottest topics within a Fixed Window of X seconds. 
         Values used are for testing purposes.
-        TODO: Fix duplicated k/v pairs when using TopCombineFn with triggers.
+        NB: Using a custom TopFn that will deduplicate k/v pairs
+        when using an accumulation strategy: SO - 56616576 @guillem-xercavins
         """
         (inputs
          | 'Apply Window of time %s' % 'Topics' >> beam.WindowInto(
                         beam.window.FixedWindows(size=10 * 60),
-                        trigger=trigger.Repeatedly(trigger.AfterCount(10)),
+                        trigger=trigger.Repeatedly(trigger.AfterCount(5)),
                         accumulation_mode=trigger.AccumulationMode.ACCUMULATING)
          | beam.Map(lambda element: element['group'])
          | beam.ParDo(PairTopicWithOneFn())
